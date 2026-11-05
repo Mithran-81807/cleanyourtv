@@ -1082,6 +1082,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     @Override
     protected void onResume() {
         super.onResume();
+	showSplashOncePerBoot();
         resumed = true;
         // A festival that started or ended while Home was in the background: rebuild with or without it.
         if (festive != festival.active(LocalDate.now())) {
@@ -3214,6 +3215,32 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
         btnInputs.setVisibility(any ? View.VISIBLE : View.GONE);
     }
+	 /** Credit splash: once per boot, on the first Home after the TV starts. */
+	    private static boolean splashReceiverRegistered = false;
+    private static boolean splashScreenWasOff = false;
+
+    /** Credit splash: on the first Home after the TV starts, and on Home after every screen wake-up. */
+    private void showSplashOncePerBoot() {
+        if (!splashReceiverRegistered) {
+            splashReceiverRegistered = true;
+            getApplicationContext().registerReceiver(new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context c, Intent i) {
+                    splashScreenWasOff = true;
+                }
+            }, new IntentFilter(Intent.ACTION_SCREEN_OFF));
+        }
+        boolean wake = splashScreenWasOff;
+        splashScreenWasOff = false;
+        boolean newBoot = false;
+        int boot = Settings.Global.getInt(getContentResolver(), Settings.Global.BOOT_COUNT, -1);
+        if (boot >= 0) {
+            SharedPreferences p = getSharedPreferences("splash_boot", MODE_PRIVATE);
+            if (p.getInt("boot", -1) != boot && p.edit().putInt("boot", boot).commit()) newBoot = true;
+        }
+        if (newBoot || wake) startActivity(new Intent(this, SplashActivity.class));
+    }
+   
 
     /** boot_to_live_tv, or the Open on start app: the first time Home comes up after the TV starts, open that app
      *  instead. Once per boot, keyed on Settings.Global.BOOT_COUNT and committed to disk before the app starts: on a
